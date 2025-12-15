@@ -33,7 +33,7 @@ class BingoEngine:
         # 1. ใช้ Q&A สำหรับทำตารางแค่ 25 คู่แรกเท่านั้น
         qa_for_cards = qa_pairs[:25]
         
-        # 2. 💡 FIX: ดึงเฉพาะ 'คำตอบ' (ส่วนหลังเครื่องหมาย ':') มาใช้ในการ์ด
+        # 2. ดึงเฉพาะ 'คำตอบ' (ส่วนหลังเครื่องหมาย ':') มาใช้ในการ์ด
         answers = []
         for pair in qa_for_cards: 
             _, _, a = pair.partition(':')
@@ -58,7 +58,7 @@ class BingoEngine:
             cards.append(card)
         return cards
     
-    # 💡 FIX 2: Text Wrapping Helper สำหรับช่องบิงโก
+    # 💡 FIX 2.1: Text Wrapping Helper สำหรับช่องบิงโก
     def _wrap_text_to_lines_fixed(self, c, text, font_name, max_width, font_size=12, min_font_size=8):
         """Helper function สำหรับตัดข้อความในช่องบิงโก (ใช้ขนาด 12pt คงที่)"""
         
@@ -88,8 +88,9 @@ class BingoEngine:
             
         # ถ้าข้อความยาวเกินไป (เกิน 4 บรรทัด) อาจต้องลดขนาดฟอนต์
         if len(lines) > 4 and font_size > min_font_size:
+            # 💡 FIX: แก้ไขการเรียกตัวเองซ้ำ (Recursive Call) โดยเพิ่ม 'c' (canvas)
             # ใช้ขนาดเล็กสุด (8pt) แล้วลองตัดใหม่
-            return self._wrap_text_to_lines_fixed(text, font_name, max_width, min_font_size, min_font_size)
+            return self._wrap_text_to_lines_fixed(c, text, font_name, max_width, min_font_size, min_font_size)
             
         return lines, font_size 
 
@@ -153,8 +154,8 @@ class BingoEngine:
                     c.setFillColor(canvas_text_color)
 
                     if str(word) != "FREE":
-                        # 💡 ใช้ Helper Function เพื่อตัดบรรทัด
-                        lines, font_size = self._wrap_text_to_lines_fixed(str(word), self.font_name, cell_size)
+                        # 💡 FIX: แก้ไขการเรียกฟังก์ชัน โดยเพิ่ม 'c' (canvas) เป็น Argument ตัวที่ 1
+                        lines, font_size = self._wrap_text_to_lines_fixed(c, str(word), self.font_name, cell_size)
                         
                         line_spacing = font_size + 2 
                         total_text_height = len(lines) * line_spacing
@@ -189,6 +190,9 @@ class BingoEngine:
         words = text.split()
         lines = []
         current_line = ""
+        
+        # ต้องลงทะเบียนฟอนต์ทุกครั้ง (ป้องกันปัญหาของ reportlab)
+        pdfmetrics.registerFont(TTFont(font_name, self.font_path)) 
         
         for word in words:
             test_line = (current_line + " " + word).strip()
@@ -230,11 +234,10 @@ class BingoEngine:
         
         # เพิ่ม Note
         c.setFillColor(HexColor("#FF4500")) # Orange Red
-        c.drawString(margin, height - 100, f"รายการที่ 1-25 คือคำถามหลัก | รายการที่ 26-35 คือคำถามสำรอง (สำหรับเกมยืดเยื้อ)")
+        c.drawString(margin, height - 100, f"รายการที่ 1-25 คือคำถามหลัก | รายการที่ 26-{len(qa_pairs)} คือคำถามสำรอง (สำหรับเกมยืดเยื้อ)")
         c.setFillColor(black) # รีเซ็ตสี
 
         # 💡 FIX: กำหนดความสูงที่ใช้สำหรับ 1 รายการ (item block) ให้มากขึ้น
-        # เผื่อสำหรับ Q (หลายบรรทัด) และ A (หลายบรรทัด) + Spacing
         item_block_height = 80 
         start_y_content = height - 130 
         
