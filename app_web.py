@@ -4,11 +4,17 @@ from core.ai_assistant import AIAssistant
 from dotenv import load_dotenv 
 import os 
 import pandas as pd
+from typing import List, Tuple, Any
 
 # --- สำคัญมาก: โหลด .env ก่อนรันโค้ดส่วนอื่น ---
 load_dotenv() 
 
-# 💡 FIX: ฟังก์ชัน Callback สำหรับปุ่ม AI (ปรับปรุง)
+# --- Initialize session state ---
+# ใช้ 'words_area_key' เป็นตัวควบคุมค่าใน Text Area
+if 'words_area_key' not in st.session_state:
+    st.session_state.words_area_key = ""
+
+# 💡 FIX: ฟังก์ชัน Callback สำหรับปุ่ม AI 
 def generate_ai_words_callback(topic, count):
     """
     Callback function เพื่อสร้างคำศัพท์และอัปเดต Session State
@@ -16,14 +22,17 @@ def generate_ai_words_callback(topic, count):
     """
     try:
         # แสดงสถานะการทำงานทันที
-        st.session_state.ai_status = f"กำลังให้ AI คิดคำศัพท์ 25 คำสำหรับหัวข้อ '{topic}'..."
+        st.session_state.ai_status = f"กำลังให้ AI คิดคำศัพท์ {count} คำสำหรับหัวข้อ '{topic}'..."
         
         with st.spinner("AI กำลังสร้างคำศัพท์..."):
+            # เนื่องจาก callback ต้องรันจบก่อนหน้าจะรีเฟรช, 
+            # เราต้องสร้าง AIAssistant ภายในนี้ 
             assistant = AIAssistant() 
             words_list_from_ai = assistant.generate_bingo_words(topic, count)
         
         if words_list_from_ai:
             # 💡 FIX สำคัญที่สุด: ตั้งค่าโดยตรงไปที่ KEY ของ widget (words_area_key)
+            # Streamlit จะนำค่านี้ไปใช้ใน Text Area ในการรันหน้าเว็บครั้งถัดไป
             st.session_state.words_area_key = ", ".join(words_list_from_ai)
             st.session_state.ai_status = "✅ AI สร้างคำศัพท์สำเร็จ!"
         else:
@@ -74,27 +83,31 @@ bingo_title = st.text_input("ชื่อหัวข้อ/ชื่อบิ�
 col1, col2 = st.columns([0.7, 0.3])
 
 with col1:
-    words_input_widget = st.text_area( # เปลี่ยนชื่อตัวแปรเพื่อไม่ให้สับสน
+    st.text_area(
         "คำศัพท์ (คั่นด้วยจุลภาค , )",
         height=300,
-        placeholder="ป้อนคำศัพท์ที่นี่ (ต้องการอย่างน้อย 25 คำสำหรับ 5x5)",
-        value="", # ตั้งค่าเริ่มต้นเป็นว่างเปล่า
-        key="words_area_key" # *** ใช้ key นี้เป็นตัวควบคุมหลัก ***
+        placeholder=f"ป้อนคำศัพท์ที่นี่ (ต้องการอย่างน้อย {min_words} คำสำหรับ {grid_size}x{grid_size})",
+        # ใช้ key นี้เป็นตัวควบคุมค่าใน Session State
+        key="words_area_key" 
+        # ไม่ต้องตั้งค่า value เพราะมันใช้ค่าจาก Session State โดยอัตโนมัติ
     )
     
 with col2:
     st.markdown("#### หรือให้ AI ช่วยคิดคำ")
     ai_topic = st.text_input("หัวข้อสำหรับ AI", value="ผลไม้ไทย")
     
+    # 💡 ปรับปรุง: ใช้ min_words เป็นจำนวนคำที่ AI ต้องสร้าง
+    ai_count = min_words 
+    
     # ใช้ on_click callback
     st.button(
-        "✨ ใช้ AI ช่วยคิดคำ (Llama-3)", 
+        f"✨ ใช้ AI ช่วยคิดคำ ({ai_count} คำ)", 
         on_click=generate_ai_words_callback, 
-        args=(ai_topic, 25),
+        args=(ai_topic, ai_count),
         disabled=(not os.environ.get("GROQ_API_KEY"))
     )
     
-    # แสดงสถานะ AI
+    # แสดงสถานะ AI จาก Callback
     if 'ai_status' in st.session_state:
         if "✅" in st.session_state.ai_status:
             st.success(st.session_state.ai_status)
@@ -107,7 +120,7 @@ with col2:
 if st.button("🚀 สร้างบิงโก (Generate)", type="primary"):
     
     # 💡 FIX: ดึงค่าล่าสุดจาก Session State โดยตรงผ่าน KEY
-    words_input = st.session_state.get("words_area_key", "") # ดึงค่าจาก key
+    words_input = st.session_state.get("words_area_key", "") 
     words_list = [w.strip() for w in words_input.split(',') if w.strip()]
     
     if len(words_list) < min_words:
@@ -117,7 +130,8 @@ if st.button("🚀 สร้างบิงโก (Generate)", type="primary"):
             engine = BingoEngine() 
             cards_data = engine.generate_cards_data(words_list, num_cards, grid_size)
             
-            pdf_bytes = engine.create_pdf_bytes(
+            # 1. สร้าง PDF ชุดผู้เล่น (Player Cards)
+            pdf_cards_bytes = engine.create_pdf_bytes(
                 cards_data, 
                 title=bingo_title, 
                 grid_size=grid_size,
@@ -127,16 +141,32 @@ if st.button("🚀 สร้างบิงโก (Generate)", type="primary"):
                 logo_file=uploaded_file
             )
             
-            st.success(f"✅ สร้างบิงโกสำเร็จ {num_cards} ใบ! พร้อมสีและโลโก้ที่คุณกำหนด")
+            # 2. 💡 NEW: สร้าง PDF ชุดดำเนินเกม (Caller Sheet)
+            pdf_caller_bytes = engine.create_caller_sheet_pdf_bytes(words_list, bingo_title)
+
+            st.success(f"✅ สร้างชุดบิงโกสำเร็จ {num_cards} ใบ พร้อมชุดดำเนินเกม!")
             
-            st.download_button(
-                label="📥 ดาวน์โหลดไฟล์ PDF",
-                data=pdf_bytes,
-                file_name="bingo-cards.pdf",
-                mime="application/pdf"
-            )
+            # --- ปุ่มดาวน์โหลด 2 ปุ่ม ---
+            col_dl1, col_dl2 = st.columns(2)
+            
+            with col_dl1:
+                st.download_button(
+                    label="📥 ดาวน์โหลด [ชุดผู้เล่น] (Player Cards) PDF",
+                    data=pdf_cards_bytes,
+                    file_name=f"{bingo_title.replace(' ', '_')}_Player_Cards.pdf",
+                    mime="application/pdf"
+                )
+            
+            with col_dl2:
+                st.download_button(
+                    label="📥 ดาวน์โหลด [ชุดดำเนินเกม] (Caller Sheet) PDF",
+                    data=pdf_caller_bytes,
+                    file_name=f"{bingo_title.replace(' ', '_')}_Caller_Sheet.pdf",
+                    mime="application/pdf"
+                )
             
             with st.expander("👀 ดูตัวอย่างข้อมูลในการ์ดใบที่ 1"):
+                # แสดงตัวอย่างตารางด้วย Pandas
                 df = pd.DataFrame([cards_data[0][i:i + grid_size] for i in range(0, len(cards_data[0]), grid_size)])
                 st.table(df)
                 
