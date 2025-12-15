@@ -5,24 +5,36 @@ from dotenv import load_dotenv
 import os 
 import pandas as pd
 from typing import List, Tuple, Any
+# 💡 NEW IMPORTS: เพิ่ม io และ zipfile สำหรับการสร้าง ZIP
+import io
+import zipfile 
 
 # --- สำคัญมาก: โหลด .env ก่อนรันโค้ดส่วนอื่น ---
 load_dotenv() 
+
+# 💡 NEW CONSTANT: กำหนดจำนวน Q&A ที่ต้องการทั้งหมด (หลัก 25 + สำรอง 10 = 35)
+TOTAL_QA_COUNT = 35
 
 # --- Initialize session state ---
 if 'words_area_key' not in st.session_state:
     st.session_state.words_area_key = ""
 
-# 💡 NEW CONSTANT: กำหนดจำนวน Q&A ที่ต้องการทั้งหมด (หลัก 25 + สำรอง 10 = 35)
-TOTAL_QA_COUNT = 35
+# 💡 NEW HELPER FUNCTION: สร้าง ZIP File ในหน่วยความจำ
+def create_zip_of_pdfs(pdf1_bytes: bytes, pdf1_name: str, pdf2_bytes: bytes, pdf2_name: str) -> bytes:
+    """สร้าง ZIP File ในหน่วยความจำที่มี 2 ไฟล์ PDF อยู่ภายใน"""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr(pdf1_name, pdf1_bytes)
+        zip_file.writestr(pdf2_name, pdf2_bytes)
+    zip_buffer.seek(0)
+    return zip_buffer.read()
 
-# 💡 FIX: ฟังก์ชัน Callback สำหรับปุ่ม AI (เปลี่ยนไปใช้ TOTAL_QA_COUNT)
+# 💡 FIX: ฟังก์ชัน Callback สำหรับปุ่ม AI 
 def generate_ai_words_callback(topic):
     """
     Callback function เพื่อสร้างคู่คำถาม:คำตอบ และอัปเดต Session State
     """
     try:
-        # ใช้ TOTAL_QA_COUNT = 35 ในการเรียก AI
         st.session_state.ai_status = f"กำลังให้ AI คิดคำถาม-คำตอบ {TOTAL_QA_COUNT} คู่สำหรับหัวข้อ '{topic}'..."
         
         with st.spinner("AI กำลังสร้าง Q&A..."):
@@ -30,7 +42,7 @@ def generate_ai_words_callback(topic):
             qa_pairs_list = assistant.generate_bingo_qa_pairs(topic, TOTAL_QA_COUNT)
         
         if qa_pairs_list:
-            st.session_state.words_area_key = "\n".join(qa_pairs_list) # ใช้ Newline เพื่อให้อ่านง่ายขึ้น
+            st.session_state.words_area_key = "\n".join(qa_pairs_list) 
             st.session_state.ai_status = f"✅ AI สร้างคำถาม-คำตอบสำเร็จ! ({len(qa_pairs_list)} คู่)"
         else:
             st.session_state.ai_status = "❌ AI ไม่สามารถสร้างคำถาม-คำตอบได้ กรุณาตรวจสอบ API Key หรือลองใหม่อีกครั้ง"
@@ -40,15 +52,13 @@ def generate_ai_words_callback(topic):
 
 
 # --- ตั้งค่าหน้าเว็บ ---
-st.set_page_config(page_title="Bingo Creator AI by MK (Q&A Mode)", page_icon="🎲", layout="wide")
+st.set_page_config(page_title="Bingo Q&A Creator AI by MK (Q&A Mode)", page_icon="🎲", layout="wide")
 
 # --- Sidebar (เมนูซ้ายมือ) ---
 with st.sidebar:
     st.header("⚙️ ตั้งค่า (Settings)")
-    # ขนาดตาราง 5x5 ต้องมี 25 คำหลัก
     grid_size = st.selectbox("ขนาดตาราง (Grid Size)", [3, 4, 5], index=2)
-    # 💡 min_words_required_for_card_data คือ 25 (5x5) หรือ 16 (4x4)
-    min_words_required_for_card_data = grid_size * grid_size 
+    min_words_required_for_card_data = grid_size * grid_size
     num_cards = st.number_input("จำนวนใบที่ต้องการ (Cards)", min_value=1, max_value=50, value=5)
     
     st.markdown("---")
@@ -92,9 +102,9 @@ with col2:
     ai_topic = st.text_input("หัวข้อสำหรับ AI (เช่น ภูมิศาสตร์)", value="ภูมิศาสตร์โลก")
     
     st.button(
-        f"✨ ใช้ AI ช่วยคิด Q&A ({TOTAL_QA_COUNT} คู่)", # 💡 แสดง 35 คู่
+        f"✨ ใช้ AI ช่วยคิด Q&A ({TOTAL_QA_COUNT} คู่)",
         on_click=generate_ai_words_callback, 
-        args=(ai_topic,), # ไม่ต้องส่ง count เพราะใช้ค่าคงที่ TOTAL_QA_COUNT
+        args=(ai_topic,),
         disabled=(not os.environ.get("GROQ_API_KEY"))
     )
     
@@ -113,17 +123,16 @@ if st.button("🚀 สร้างบิงโก Q&A (Generate)", type="primary
     qa_pairs_list = [pair.strip() for pair in words_input.split('\n') if pair.strip() and ':' in pair]
 
     
-    # 💡 CHECK: ตรวจสอบขั้นต่ำที่ต้องการ (min_words_required_for_card_data)
     if len(qa_pairs_list) < min_words_required_for_card_data:
         st.error(f"❌ คู่คำถาม-คำตอบไม่พอครับ! ต้องการอย่างน้อย {min_words_required_for_card_data} คู่ (ตอนนี้มี {len(qa_pairs_list)} คู่) และต้องมีเครื่องหมาย ':'")
     else:
         try:
             engine = BingoEngine() 
             
-            # สร้างการ์ดผู้เล่น (จะดึงแค่ 25 คำถามแรก)
+            # 1. สร้างข้อมูลการ์ด
             cards_data = engine.generate_cards_data(qa_pairs_list, num_cards, grid_size)
             
-            # 1. สร้าง PDF ชุดผู้เล่น (Player Cards)
+            # 2. สร้าง PDF ชุดผู้เล่น (Player Cards)
             pdf_cards_bytes = engine.create_pdf_bytes(
                 cards_data, 
                 title=bingo_title, 
@@ -134,31 +143,29 @@ if st.button("🚀 สร้างบิงโก Q&A (Generate)", type="primary
                 logo_file=uploaded_file
             )
             
-            # 2. สร้าง PDF ชุดดำเนินเกม (Caller Sheet) - ใช้ทั้งหมดที่มี (สูงสุด 35 คู่)
+            # 3. สร้าง PDF ชุดดำเนินเกม (Caller Sheet)
             pdf_caller_bytes = engine.create_caller_sheet_pdf_bytes(qa_pairs_list, bingo_title)
 
-            st.success(f"✅ สร้างชุดบิงโกสำเร็จ {num_cards} ใบ พร้อมชุดดำเนินเกม (Q&A)!")
-            
-            # --- ปุ่มดาวน์โหลด 2 ปุ่ม ---
-            col_dl1, col_dl2 = st.columns(2)
-            
-            with col_dl1:
-                st.download_button(
-                    label="📥 ดาวน์โหลด [ชุดผู้เล่น] (Player Cards) PDF",
-                    data=pdf_cards_bytes,
-                    file_name=f"{bingo_title.replace(' ', '_')}_Player_Cards.pdf",
-                    mime="application/pdf",
-                    key='dl_player_cards' 
-                )
-            
-            with col_dl2:
-                st.download_button(
-                    label="📥 ดาวน์โหลด [ชุดดำเนินเกม] (Q&A Caller Sheet) PDF",
-                    data=pdf_caller_bytes,
-                    file_name=f"{bingo_title.replace(' ', '_')}_Caller_Sheet.pdf",
-                    mime="application/pdf",
-                    key='dl_caller_sheet' 
-                )
+            # 4. สร้าง ZIP File รวม 2 ไฟล์
+            zip_file_name = f"{bingo_title.replace(' ', '_')}_Bingo_Set.zip"
+            player_pdf_name = f"Player_Cards_{num_cards}p.pdf"
+            caller_pdf_name = "Caller_Sheet_QnA.pdf"
+
+            zip_bytes = create_zip_of_pdfs(
+                pdf_cards_bytes, player_pdf_name, 
+                pdf_caller_bytes, caller_pdf_name
+            )
+
+            st.success(f"✅ สร้างชุดบิงโกสำเร็จ {num_cards} ใบ พร้อมชุดดำเนินเกม (Q&A) ในไฟล์ ZIP เดียว!")
+
+            # 5. ปุ่มดาวน์โหลด ZIP File ปุ่มเดียว
+            st.download_button(
+                label=f"⬇️ ดาวน์โหลดชุดบิงโกทั้งหมด (.ZIP)",
+                data=zip_bytes,
+                file_name=zip_file_name,
+                mime="application/zip",
+                key='dl_bingo_set_zip'
+            )
             
             # แสดงตัวอย่าง
             with st.expander("👀 ดูตัวอย่างคำถามในการ์ดใบที่ 1 (Questions Only)"):
