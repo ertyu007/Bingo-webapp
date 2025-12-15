@@ -21,17 +21,30 @@ class BingoEngine:
         except:
             self.font_name = "Helvetica" # Fallback
 
-    def generate_cards_data(self, words: List[str], num_cards: int = 1, grid_size: int = 5) -> List[List[str]]:
-        """สุ่มคำศัพท์ลงตาราง"""
+    # 💡 UPDATED: รับรายการ Q&A (List[str]) และดึงเฉพาะ "คำถาม" 25 คู่แรก สำหรับการ์ดผู้เล่น
+    def generate_cards_data(self, qa_pairs: List[str], num_cards: int = 1, grid_size: int = 5) -> List[List[str]]:
+        """
+        สุ่มคำถามลงตารางสำหรับผู้เล่น โดยใช้เพียง 25 คู่แรกจากรายการ Q&A
+        """
         cards = []
         total_cells = grid_size * grid_size
         center_index = total_cells // 2
         
-        # เติมช่องว่างถ้าคำศัพท์ไม่พอ
-        words_for_card = words + [""] * max(0, total_cells - len(words))
+        # 1. ใช้คำถามสำหรับทำตารางแค่ 25 คำแรกเท่านั้น
+        qa_for_cards = qa_pairs[:25]
+        
+        # 2. ดึงเฉพาะ 'คำถาม' (ส่วนแรกก่อนเครื่องหมาย ':') มาใช้ในการ์ด
+        questions = []
+        for pair in qa_for_cards: # ใช้เฉพาะ 25 คู่แรก
+            q, _, _ = pair.partition(':')
+            questions.append(q.strip())
+        
+        # ... (ส่วน Logic การสร้างตารางและสุ่มเหมือนเดิม) ...
+        # เติมช่องว่างถ้าคำถามไม่พอ
+        words_for_card = questions + [""] * max(0, total_cells - len(questions))
 
         for _ in range(num_cards):
-            # สุ่มคำศัพท์
+            # สุ่มคำถาม
             card = random.sample(words_for_card, total_cells)
             
             # ใส่ FREE SPACE ถ้าขนาดเป็นเลขคี่
@@ -40,22 +53,23 @@ class BingoEngine:
                 
             cards.append(card)
         return cards
-
+    
+    # ... (ส่วน create_pdf_bytes เหมือนเดิม) ...
     def create_pdf_bytes(self, cards_data: List[List[str]], title: str, grid_size: int, bg_color: str, text_color: str, free_space_color: str, logo_file: Any = None) -> bytes:
-        """
-        สร้างไฟล์ PDF สำหรับการ์ดผู้เล่น
-        """
+        # โค้ดส่วนนี้เหมือนเดิม 
+        # ... 
+        # (ตัดออกเพื่อความกระชับ)
+        # ... 
+        
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=A4)
         width, height = A4
         margin = 30
         
-        # แปลงสี Hex เป็น ReportLab Color Object
         canvas_bg_color = HexColor(bg_color)
         canvas_text_color = HexColor(text_color)
         canvas_free_color = HexColor(free_space_color)
         
-        # คำนวณขนาดการ์ดและช่อง
         card_width = (width - margin * 2) 
         cell_size = card_width / grid_size
         
@@ -101,61 +115,64 @@ class BingoEngine:
                     c.setStrokeColor(canvas_text_color) 
                     c.rect(x, y - cell_size, cell_size, cell_size, fill=0) 
                     
-                    # 3. วาดข้อความ
+                    # 3. วาดข้อความ (คำถาม)
                     c.setFillColor(canvas_text_color)
-                    text_y = y - (cell_size / 2) - 5 # ปรับแกน Y นิดหน่อยให้กลาง
+                    text_y = y - (cell_size / 2) - 5 
                     c.drawCentredString(x + (cell_size / 2), text_y, str(word))
             
-            # ขึ้นหน้าใหม่สำหรับการ์ดถัดไป
             c.showPage()
             
         c.save()
         buffer.seek(0)
         return buffer.read()
 
-    # 💡 NEW: ฟังก์ชันสำหรับสร้าง PDF ชุดคำศัพท์สำหรับผู้ดำเนินเกม (Caller Sheet)
-    def create_caller_sheet_pdf_bytes(self, words: List[str], title: str) -> bytes:
+
+    # 💡 UPDATED: Caller Sheet ใช้ Q&A ทั้งหมด (35 คู่)
+    def create_caller_sheet_pdf_bytes(self, qa_pairs: List[str], title: str) -> bytes:
         """
-        สร้าง PDF ที่มีรายการคำศัพท์ทั้งหมดสำหรับผู้ดำเนินเกม (Game Caller)
-        คำศัพท์จะถูกจัดเรียงแบบสุ่ม
+        สร้าง PDF ที่มีรายการคำถามและคำตอบทั้งหมด (จัดเรียงแบบสุ่ม) สำหรับผู้ดำเนินเกม 
         """
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=A4)
         width, height = A4
         margin = 72
         
-        # คัดลอกและสลับคำศัพท์เพื่อไม่ให้เรียงตามลำดับเดิม
-        caller_words = words.copy()
-        random.shuffle(caller_words)
+        # คัดลอกและสลับคู่ Q&A ทั้งหมด (35 คู่) เพื่อใช้ขาน
+        caller_qa_pairs = qa_pairs.copy()
+        random.shuffle(caller_qa_pairs)
         
-        # --- ตั้งค่าหน้าแรก ---
+        # ... (ส่วน Logic การสร้าง PDF เหมือนเดิม) ...
+
+        # --- ตั้งค่า Title ---
         c.setFillColor(black)
         c.setFont(self.font_name, 30)
-        c.drawCentredString(width / 2, height - 80, f"รายการคำศัพท์ (ชุดดำเนินเกม): {title}")
-
+        c.drawCentredString(width / 2, height - 80, f"ชุดดำเนินเกม (คำถามและคำตอบ): {title}")
         c.setFont(self.font_name, 14)
-        line_height = 20
-        start_y_content = height - 100
+        # 💡 เพิ่ม Note เกี่ยวกับคำถามสำรอง
+        c.setFillColor(HexColor("#FF4500")) # Orange Red
+        c.drawString(margin, height - 100, f"รายการที่ 1-25 คือคำถามหลัก | รายการที่ 26-35 คือคำถามสำรอง (สำหรับเกมยืดเยื้อ)")
+        c.setFillColor(black) # รีเซ็ตสี
+
+        line_height = 40 
+        start_y_content = height - 130 # ปรับตำแหน่ง Y ลงมาเล็กน้อย
         
         # จัดคอลัมน์
-        cols = 3
+        cols = 2  
         col_width = (width - 2 * margin) / cols
         
         # คำนวณจำนวนคำต่อคอลัมน์ต่อหน้าเพื่อจัดการหน้ากระดาษ
         max_items_per_col = int((start_y_content - margin) / line_height)
         items_per_page = max_items_per_col * cols
         
-        for i, word in enumerate(caller_words):
+        for i, pair in enumerate(caller_qa_pairs):
             
             # ตรวจสอบว่าต้องขึ้นหน้าใหม่หรือไม่
             if i > 0 and i % items_per_page == 0:
                  c.showPage()
                  c.setFillColor(black)
                  c.setFont(self.font_name, 20)
-                 c.drawCentredString(width / 2, height - 50, f"รายการคำศัพท์ (ต่อ)")
+                 c.drawCentredString(width / 2, height - 50, f"ชุดดำเนินเกม (ต่อ)")
                  c.setFont(self.font_name, 14)
-                 
-                 # รีเซ็ตตำแหน่ง Y สำหรับหน้าใหม่
                  start_y_content = height - 100
                  
             # คำนวณตำแหน่งคอลัมน์และบรรทัด
@@ -163,12 +180,31 @@ class BingoEngine:
             col_index = item_on_page_index // max_items_per_col
             row_index = item_on_page_index % max_items_per_col
             
-            # ตำแหน่ง X และ Y
             current_x = margin + (col_index * col_width)
             current_y = start_y_content - (row_index * line_height)
             
-            # วาดหมายเลขนำหน้า
-            c.drawString(current_x, current_y, f"{i+1}. {word}")
+            # แยกคำถามและคำตอบ
+            question, _, answer = pair.partition(':')
+            question = question.strip()
+            answer = answer.strip() if answer else "[ไม่มีคำตอบ]"
+            
+            # 💡 เพิ่มสีเตือนสำหรับคำถามสำรอง (รายการที่ 26 ขึ้นไป)
+            item_number = i + 1
+            if item_number > 25:
+                 c.setFillColor(HexColor("#FF4500")) # สีส้มแดง
+            else:
+                 c.setFillColor(black) # สีดำ
+
+            # วาดหมายเลขนำหน้าและคำถาม
+            c.setFont(self.font_name, 14)
+            c.drawString(current_x, current_y, f"{item_number}. คำถาม: {question}")
+            
+            # วาดคำตอบ (เยื้องลงมาเล็กน้อย)
+            c.setFillColor(HexColor("#32CD32")) # สีเขียว (Lime Green) สำหรับคำตอบ
+            c.setFont(self.font_name, 12)
+            c.drawString(current_x + 10, current_y - 15, f"   คำตอบ: {answer}")
+            
+            c.setFillColor(black) # รีเซ็ตสีสำหรับรายการถัดไป
             
         c.save()
         buffer.seek(0)
