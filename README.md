@@ -4,13 +4,9 @@
 <p align="center">
   
   [![Status](https://img.shields.io/badge/Status-Complete-success?style=flat&logo=checkmarx)](https://github.com/ertyu007/Bingo-webapp)
-  
   [![Made with Python](https://img.shields.io/badge/Code-Python-blue?style=flat&logo=python)](https://www.python.org/)
-  
   [![Frontend](https://img.shields.io/badge/Frontend-Streamlit-red?style=flat&logo=streamlit)](https://streamlit.io/)
-  
   [![AI Engine](https://img.shields.io/badge/AI%20Engine-Groq%20Llama%203.1-orange?style=flat&logo=amd)](https://groq.com/)
-  
   [![License](https://img.shields.io/badge/License-MIT-green?style=flat)](https://opensource.org/licenses/MIT)
   
 </p>
@@ -35,9 +31,17 @@
 ## 🛠️ โครงสร้างโปรเจกต์ (Project Structure)
 
 โปรเจกต์นี้ถูกออกแบบมาอย่างเป็นโมดูล (Modular) ตามหลักการ Clean Architecture เพื่อให้ง่ายต่อการดูแลรักษา:
-
-. ├── assets/ │ └── fonts/ │ └── TH Niramit AS.ttf # ฟอนต์ไทยสำหรับ PDF ├── core/ │ ├── ai_assistant.py # Logic การเรียกใช้ Groq AI และทำความสะอาดคำศัพท์ │ └── bingo_engine.py # Logic การสร้าง PDF (การ์ดผู้เล่น & Caller Sheet) ├── app_web.py # Streamlit Web Application (UI/UX) └── requirements.txt # รายการ Library ที่ต้องติดตั้ง └── README.md 
-
+```
+. ├── assets/
+  │   └── fonts/
+  │   └── TH Niramit AS.ttf # ฟอนต์ไทยสำหรับ PDF
+  ├── core/
+  │   ├── ai_assistant.py # Logic การเรียกใช้ Groq AI และทำความสะอาดคำศัพท์
+  │   └── bingo_engine.py # Logic การสร้าง PDF (การ์ดผู้เล่น & Caller Sheet)
+  ├── app_web.py # Streamlit Web Application (UI/UX)
+  └── requirements.txt # รายการ Library ที่ต้องติดตั้ง
+  └── README.md 
+```
 
 ---
 
